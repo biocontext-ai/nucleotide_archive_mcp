@@ -1,0 +1,27 @@
+# Temp files
+.DS_Store
+*~
+buck-out/
+
+
+# Compiled files
+.venv/
+__pycache__/
+.*cache/
+
+# Distribution / packaging
+/dist/
+
+# Tests and coverage
+/data/
+/node_modules/
+
+# docs
+/docs/generated/
+/docs/_build/
+EBI_SEARCH.md
+ENA_Portal_API.md
+ENA_Browser_API.md
+
+# IDEs and editors
+.claude/
