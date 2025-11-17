@@ -4,7 +4,7 @@ requires = [ "hatchling" ]
 
 [project]
 name = "nucleotide-archive-mcp"
-version = "0.0.1"
+version = "0.0.2"
 description = "MCP server for searching European Nucleotide Archive (ENA) datasets. Find RNA-seq studies, retrieve metadata, and discover related publications to validate research hypotheses."
 readme = "README.md"
 license = { file = "LICENSE" }
