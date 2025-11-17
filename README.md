@@ -14,40 +14,58 @@ A Model Context Protocol (MCP) server for searching and accessing RNA sequencing
 ## Features
 
 - **Disease-Focused Search**: Find datasets by disease, organism, and tissue type
-- **Technology Filtering**: Filter by bulk RNA-seq, single-cell, or both
+- **Advanced Technology Filtering**:
+  - Simple presets: bulk, single-cell, small-rna, ribo-seq, rna-all
+  - Granular control: Filter by 50+ library strategies (RNA-Seq, miRNA-Seq, ChIP-Seq, ATAC-seq, etc.)
+  - Source filtering: TRANSCRIPTOMIC, GENOMIC, METAGENOMIC, etc.
+- **Common Organism Names**: Use "human", "mouse", "rat" instead of scientific names
 - **Download Support**: Generate wget/curl scripts for downloading FASTQ files
-- **Study Metadata**: Retrieve comprehensive metadata for specific studies
+- **Study Metadata**: Retrieve comprehensive metadata including PubMed IDs
 - **Publication Links**: Discover datasets associated with PubMed publications
 - **Flexible Queries**: Build custom queries with multiple field conditions
 - **Field Discovery**: Explore available search and return fields
+- **Environment Configuration**: Customize API endpoints, timeouts, and logging via environment variables
 
 ## Available Tools
 
-The MCP server provides 9 specialized tools:
+The MCP server provides 10 specialized tools:
 
 ### Search & Discovery
-1. **search_rna_studies** - Search for RNA-seq studies by disease, organism, and technology type
-2. **get_study_details** - Get comprehensive metadata for a specific study
-3. **find_studies_by_publication** - Find studies associated with a PubMed ID
-4. **search_studies_by_keywords** - Flexible keyword search across study titles
+1. **search_rna_studies** - Unified search with preset filters or advanced library strategy/source filtering
+2. **list_library_types** - List all 50+ available library strategies and sources
+3. **get_study_details** - Get comprehensive metadata for a specific study (includes PubMed IDs)
+4. **find_studies_by_publication** - Find studies associated with a PubMed ID
+5. **search_studies_by_keywords** - Flexible keyword search across study titles
 
 ### Download & Access
-5. **get_download_urls** - Get FTP download URLs for all data files in a study
-6. **generate_download_script** - Generate bash scripts (wget/curl) for downloading data
+6. **get_download_urls** - Get FTP download URLs for all data files in a study
+7. **generate_download_script** - Generate bash scripts (wget/curl) for downloading data
 
 ### Advanced
-7. **get_available_fields** - Discover searchable and returnable fields for different data types
-8. **get_result_types** - List all available data types in ENA
-9. **build_custom_query** - Construct advanced queries with multiple field conditions
+8. **get_available_fields** - Discover searchable and returnable fields for different data types
+9. **get_result_types** - List all available data types in ENA
+10. **build_custom_query** - Construct advanced queries with multiple field conditions
 
 ## Example Use Cases
 
-- Find human cancer RNA-seq datasets for validation studies
-- Search for single-cell RNA-seq data in mouse brain tissue
+### Simple Searches (Preset Filters)
+- Find human cancer bulk RNA-seq datasets: `disease="cancer"`
+- Search for single-cell RNA-seq in mouse brain: `organism="mouse", tissue="brain", technology="single-cell"`
+- Find small RNA sequencing studies: `technology="small-rna"`
+- Ribosome profiling experiments: `technology="ribo-seq"`
+
+### Advanced Searches (Specific Library Types)
+- ChIP-Seq chromatin studies: `library_strategies=["ChIP-Seq"]`
+- ATAC-seq accessibility data: `library_strategies=["ATAC-seq"]`
+- Combined small RNA types: `library_strategies=["miRNA-Seq", "ncRNA-Seq"]`
+- Any single-cell data: `library_sources=["TRANSCRIPTOMIC SINGLE CELL"]`
+- Metagenomic RNA: `library_sources=["METATRANSCRIPTOMIC"]`
+
+### Workflow Examples
 - Download FASTQ files from a specific study
 - Discover datasets from a specific publication
-- Filter by technology type (bulk vs single-cell RNA-seq)
 - Generate download scripts with MD5 verification
+- List all available sequencing technologies: `list_library_types()`
 
 ## Getting started
 
@@ -144,6 +162,29 @@ pip install --user nucleotide_archive_mcp
 ```bash
 pip install git+https://github.com/biocontext-ai/nucleotide_archive_mcp.git@main
 ```
+
+## Configuration
+
+The server can be configured via environment variables. Copy `.env.example` to `.env` and customize:
+
+```bash
+# ENA API Configuration
+ENA_PORTAL_API_BASE=https://www.ebi.ac.uk/ena/portal/api  # Override API base URL
+ENA_BROWSER_API_BASE=https://www.ebi.ac.uk/ena/browser/api
+ENA_TIMEOUT=30.0                # Request timeout in seconds
+ENA_SEARCH_LIMIT=20            # Default search result limit
+ENA_MAX_RPS=10.0               # Rate limiting (requests per second)
+
+# Logging
+LOG_LEVEL=INFO                 # DEBUG, INFO, WARNING, ERROR, CRITICAL
+```
+
+These settings allow you to:
+- Use custom or mirror ENA API endpoints
+- Adjust timeouts for slow connections
+- Control default result limits
+- Configure rate limiting for large batch operations
+- Set logging verbosity for debugging
 
 ## Data Citation and Attribution
 
