@@ -55,7 +55,11 @@ async def search_rna_studies(
     3. Call get_study_details(study_accession) for full metadata & publications
     4. Optionally call get_download_urls() or generate_download_script() for data files
 
-    **API Limitations**: No offset-based pagination. Use limit=0 for all results (slow).
+    **API Limitations**:
+    - No offset-based pagination. Use limit=0 for all results (slow).
+    - Multi-word disease searches: Automatically splits into individual words
+      (e.g., "Fabry nephropathy" → searches for "Fabry" AND "nephropathy")
+      because the API doesn't support wildcards in multi-word phrases.
 
     Parameters
     ----------
@@ -186,8 +190,18 @@ async def search_rna_studies(
     # Add disease filter if provided
     if disease:
         # Search for disease in study title
-        # Wildcards must be inside the quotes for ENA Portal API
-        disease_query = f'study_title="*{disease}*"'
+        # Note: ENA Portal API doesn't support wildcards in multi-word phrases
+        # e.g., study_title="*Fabry nephropathy*" returns 0 results
+        # but study_title="*Fabry*" AND study_title="*nephropathy*" works
+        # Split disease into words and search for each
+        disease_words = disease.split()
+        if len(disease_words) == 1:
+            # Single word - simple wildcard search
+            disease_query = f'study_title="*{disease}*"'
+        else:
+            # Multiple words - search for each word separately with AND
+            word_queries = [f'study_title="*{word}*"' for word in disease_words]
+            disease_query = f"({' AND '.join(word_queries)})"
         query_parts.append(disease_query)
 
     # Add tissue filter if provided

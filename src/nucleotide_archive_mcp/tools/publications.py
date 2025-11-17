@@ -67,8 +67,11 @@ async def search_studies_by_keywords(
     - Finding studies by biological process/pathway terms
     - Searching when you know methodology but not disease
 
-    **Note**: Searches title (study-level) and description (sample-level) fields, so may
-    return studies where only one sample matches keywords.
+    **Note**:
+    - Searches title (study-level) and description (sample-level) fields, so may
+      return studies where only one sample matches keywords.
+    - Multi-word keywords are automatically split and searched individually
+      (e.g., "breast cancer" → searches for "breast" AND "cancer").
 
     Parameters
     ----------
@@ -104,14 +107,26 @@ async def search_studies_by_keywords(
     client = ENAClient()
 
     # Build search query for text fields
-    # Wildcards must be inside the quotes for ENA Portal API
-    # Note: read_study only has study_title field, no study_description
+    # Note: ENA Portal API doesn't support wildcards in multi-word phrases
+    # Split keywords into words and search for each
+    keyword_words = keywords.split()
+
     text_parts = []
     if include_title:
-        text_parts.append(f'study_title="*{keywords}*"')
+        if len(keyword_words) == 1:
+            text_parts.append(f'study_title="*{keywords}*"')
+        else:
+            # Multiple words - search for each word
+            word_queries = [f'study_title="*{word}*"' for word in keyword_words]
+            text_parts.append(f"({' AND '.join(word_queries)})")
+
     if include_description:
         # Use generic description field (applies to samples) as fallback
-        text_parts.append(f'description="*{keywords}*"')
+        if len(keyword_words) == 1:
+            text_parts.append(f'description="*{keywords}*"')
+        else:
+            word_queries = [f'description="*{word}*"' for word in keyword_words]
+            text_parts.append(f"({' AND '.join(word_queries)})")
 
     if not text_parts:
         return {

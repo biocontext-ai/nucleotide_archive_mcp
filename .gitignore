@@ -22,6 +22,8 @@ __pycache__/
 EBI_SEARCH.md
 ENA_Portal_API.md
 ENA_Browser_API.md
+ena_schema.json
+ena_portal_schema.json
 
 # IDEs and editors
 .claude/

@@ -1,0 +1,7 @@
+{
+	"servers": {
+		"nucleotide_archive_mcp": {
+			"url": "https://nucleotide-archive-mcp.fastmcp.app/mcp"
+		}
+	}
+}
