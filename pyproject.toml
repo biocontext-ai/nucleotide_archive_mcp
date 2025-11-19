@@ -27,6 +27,7 @@ dependencies = [
   "click",
   "fastmcp",
   "httpx==0.28.*",
+  "pydantic>=2.12,<3",
 ]
 optional-dependencies.dev = [
   "pre-commit",

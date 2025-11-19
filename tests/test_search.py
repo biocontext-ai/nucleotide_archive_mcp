@@ -9,6 +9,7 @@ Tests focus on high-level search behavior and real-world use cases:
 """
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 
 @pytest.mark.asyncio
@@ -321,20 +322,19 @@ async def test_search_with_library_sources(mcp_client):
 @pytest.mark.asyncio
 async def test_search_invalid_library_strategy(mcp_client):
     """Test that invalid library strategy returns error."""
-    result = await mcp_client.call_tool(
-        "search_rna_studies",
-        {
-            "library_strategies": ["InvalidStrategy"],
-            "technology": None,
-            "limit": 5,
-        },
-    )
+    with pytest.raises(ToolError) as exc:
+        await mcp_client.call_tool(
+            "search_rna_studies",
+            {
+                "library_strategies": ["InvalidStrategy"],
+                "technology": None,
+                "limit": 5,
+            },
+        )
 
-    data = result.data
-    assert "error" in data
-    assert "Invalid library strategies" in data["error"]
-    assert data["count"] == 0
-    assert data["studies"] == []
+    message = str(exc.value)
+    assert "library_strategies" in message
+    assert "InvalidStrategy" in message
 
 
 @pytest.mark.asyncio

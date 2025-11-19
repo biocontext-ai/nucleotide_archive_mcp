@@ -140,6 +140,73 @@ class ENAClient:
                 return int(text.split("\n")[-1])
             return int(text)
 
+    async def aggregate_count(
+        self,
+        result: str,
+        query: str,
+        field: str,
+        data_portal: str = "ena",
+        limit: int | None = None,
+    ) -> list[tuple[str, int]]:
+        """Aggregate counts grouped by a field.
+
+        Parameters
+        ----------
+        result : str
+            Result type (e.g., 'read_run').
+        query : str
+            Search query using ENA syntax.
+        field : str
+            Field name to aggregate by.
+        data_portal : str, optional
+            Data portal (default: 'ena').
+        limit : int, optional
+            Maximum number of grouped rows to return (default: API default).
+
+        Returns
+        -------
+        list[tuple[str, int]]
+            List of (field_value, count) tuples.
+        """
+        params: dict[str, Any] = {
+            "result": result,
+            "query": query,
+            "field": field,
+            "dataPortal": data_portal,
+        }
+        if limit is not None:
+            params["limit"] = limit
+
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            response = await client.get(f"{self.base_url}/count", params=params)
+            response.raise_for_status()
+
+        rows = response.text.strip().splitlines()
+        if len(rows) <= 1:
+            return []
+
+        header = rows[0].split("\t")
+        try:
+            count_idx = header.index("count")
+        except ValueError:
+            count_idx = len(header) - 1
+        value_idx = 0 if count_idx != 0 else 1
+
+        aggregates: list[tuple[str, int]] = []
+        for line in rows[1:]:
+            parts = line.split("\t")
+            if len(parts) <= count_idx or len(parts) <= value_idx:
+                continue
+            value = parts[value_idx].strip()
+            if not value:
+                continue
+            try:
+                count_value = int(parts[count_idx])
+            except ValueError:
+                continue
+            aggregates.append((value, count_value))
+        return aggregates
+
     async def get_search_fields(self, result: str) -> list[dict[str, Any]]:
         """Get available search fields for a result type.
 
