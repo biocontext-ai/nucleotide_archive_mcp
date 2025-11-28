@@ -58,13 +58,13 @@ def build_technology_filter(
     elif technology:
         preset = TECHNOLOGY_PRESETS.get(technology.lower())
         if not preset:
-            # Default to bulk
-            preset = TECHNOLOGY_PRESETS["bulk"]
+            # Default to all RNA technologies
+            preset = TECHNOLOGY_PRESETS["rna-all"]
         strategies = preset["strategies"]  # type: ignore[assignment]
         sources = preset["sources"]  # type: ignore[assignment]
     else:
-        # Default to bulk
-        preset = TECHNOLOGY_PRESETS["bulk"]
+        # Default to all RNA technologies when no filter specified
+        preset = TECHNOLOGY_PRESETS["rna-all"]
         strategies = preset["strategies"]  # type: ignore[assignment]
         sources = preset["sources"]  # type: ignore[assignment]
 

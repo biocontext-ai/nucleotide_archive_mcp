@@ -23,7 +23,7 @@ async def test_search_human_cancer_default(mcp_client):
     data = result.data
     assert data["count"] > 0, "Should find cancer studies"
     assert data["filters"]["organism"] is None, "Default organism should be None (all organisms)"
-    assert data["filters"]["technology"] == "bulk", "Default technology should be bulk RNA-seq"
+    assert data["filters"]["technology"] is None, "Default technology should be None (all RNA technologies)"
     assert data["filters"]["disease"] == "cancer"
     assert len(data["studies"]) <= 5, "Should respect limit parameter"
 

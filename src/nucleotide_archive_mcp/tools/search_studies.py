@@ -85,10 +85,10 @@ async def search_rna_studies(
     technology: Annotated[
         TechnologyPreset | None,
         Field(
-            description="RNA sequencing technology type: 'bulk' for standard RNA-Seq, 'single-cell' for scRNA-seq, 'small-rna' for miRNA/small RNA, 'ribo-seq' for ribosome profiling, 'rna-all' for any RNA technology. Set to None when using library_strategies/library_sources directly",
-            examples=["bulk", "single-cell", "small-rna"],
+            description="RNA sequencing technology type: 'bulk' for standard RNA-Seq, 'single-cell' for scRNA-seq, 'small-rna' for miRNA/small RNA, 'ribo-seq' for ribosome profiling, 'rna-all' for any RNA technology. Set to None to search ALL RNA technologies without filtering",
+            examples=["bulk", "single-cell", "small-rna", None],
         ),
-    ] = "bulk",
+    ] = None,
     tissue: Annotated[
         str | None,
         Field(
