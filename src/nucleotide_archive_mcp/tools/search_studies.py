@@ -45,16 +45,23 @@ async def _fetch_study_summaries(accessions: list[str]) -> dict[str, dict]:
     if not accessions:
         return {}
     batch = ",".join(accessions)
-    async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
-        response = await client.get(f"{ENA_BROWSER_API_BASE.rstrip('/')}/summary/{batch}")
-        response.raise_for_status()
-        payload = response.json()
-    summaries = {}
-    for item in payload.get("summaries", []):
-        accession = item.get("accession")
-        if accession:
-            summaries[accession] = item
-    return summaries
+    try:
+        async with httpx.AsyncClient(timeout=DEFAULT_TIMEOUT) as client:
+            response = await client.get(f"{ENA_BROWSER_API_BASE.rstrip('/')}/summary/{batch}")
+            response.raise_for_status()
+            payload = response.json()
+        summaries = {}
+        for item in payload.get("summaries", []):
+            accession = item.get("accession")
+            if accession:
+                summaries[accession] = item
+        return summaries
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 301:
+            return {}
+        raise
+    except httpx.HTTPError:
+        return {}
 
 
 @mcp.tool

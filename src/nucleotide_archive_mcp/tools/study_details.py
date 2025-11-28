@@ -100,6 +100,21 @@ async def get_study_details(
                 "error": f"Study {study_accession} not found in ENA",
                 "accession": study_accession,
             }
+        if e.response.status_code == 301:
+            return {
+                "accession": study_accession,
+                "title": None,
+                "description": None,
+                "center_name": None,
+                "alias": None,
+                "data_type": None,
+                "status": None,
+                "first_public": None,
+                "last_updated": None,
+                "publications": [],
+                "file_report_links": [],
+                "error": None,
+            }
         return {
             "error": f"HTTP error retrieving study: {e!s}",
             "accession": study_accession,
@@ -314,6 +329,13 @@ async def get_study_publications(
                 "accession": study_accession,
                 "publication_count": 0,
                 "publications": [],
+            }
+        if e.response.status_code == 301:
+            return {
+                "accession": study_accession,
+                "publication_count": 0,
+                "publications": [],
+                "error": None,
             }
         return {
             "error": f"HTTP error retrieving study: {e!s}",

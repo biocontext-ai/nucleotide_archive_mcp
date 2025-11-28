@@ -14,7 +14,7 @@ from fastmcp.exceptions import ToolError
 
 @pytest.mark.asyncio
 async def test_search_human_cancer_default(mcp_client):
-    """Test default use case: searching for human cancer RNA-seq studies."""
+    """Test default use case: searching for cancer RNA-seq studies across all organisms."""
     result = await mcp_client.call_tool(
         "search_rna_studies",
         {"disease": "cancer", "limit": 5},
@@ -22,7 +22,7 @@ async def test_search_human_cancer_default(mcp_client):
 
     data = result.data
     assert data["count"] > 0, "Should find cancer studies"
-    assert data["filters"]["organism"] == "Homo sapiens", "Default organism should be human"
+    assert data["filters"]["organism"] is None, "Default organism should be None (all organisms)"
     assert data["filters"]["technology"] == "bulk", "Default technology should be bulk RNA-seq"
     assert data["filters"]["disease"] == "cancer"
     assert len(data["studies"]) <= 5, "Should respect limit parameter"
