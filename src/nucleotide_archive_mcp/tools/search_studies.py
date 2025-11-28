@@ -62,68 +62,85 @@ async def search_rna_studies(
     disease: Annotated[
         str | None,
         Field(
-            description=(
-                "Disease/condition keywords matched against ENA disease and study_title fields (e.g., 'cancer', 'ALS')."
-            ),
-            examples=["cancer", "ALS"],
+            description="Disease/condition keywords to search for (e.g., 'cancer', 'ALS'). Matched against disease and study_title fields",
+            examples=["cancer", "ALS", "diabetes", "Alzheimer"],
             max_length=200,
         ),
     ] = None,
     organism: Annotated[
-        str,
+        str | None,
         Field(
-            description=(
-                "Scientific or common organism name; normalized to scientific (e.g., 'human' -> 'Homo sapiens')."
-            ),
-            examples=["Homo sapiens", "human"],
+            description="Organism to search for. Use common names like 'human' or 'mouse', or scientific names like 'Homo sapiens'. Leave as None to search across all species",
+            examples=["Homo sapiens", "human", "Mus musculus", "mouse", "zebrafish", "rat", None],
             max_length=200,
         ),
-    ] = DEFAULT_ORGANISM,
+    ] = None,
     technology: Annotated[
         TechnologyPreset | None,
         Field(
-            description=(
-                "Technology preset shortcut. Set to None when specifying library_strategies/library_sources directly."
-            ),
-            examples=["bulk"],
+            description="RNA sequencing technology type: 'bulk' for standard RNA-Seq, 'single-cell' for scRNA-seq, 'small-rna' for miRNA/small RNA, 'ribo-seq' for ribosome profiling, 'rna-all' for any RNA technology. Set to None when using library_strategies/library_sources directly",
+            examples=["bulk", "single-cell", "small-rna"],
         ),
     ] = "bulk",
     tissue: Annotated[
         str | None,
         Field(
-            description=(
-                "Tissue or cell-type keywords matched against ENA tissue_type and study_title fields (e.g., 'brain')."
-            ),
-            examples=["brain", "liver"],
+            description="Tissue or cell type keywords to search for (e.g., 'brain', 'liver'). Matched against tissue_type and study_title fields",
+            examples=["brain", "liver", "heart", "kidney"],
             max_length=200,
         ),
     ] = None,
     library_strategies: Annotated[
         list[LibraryStrategy] | None,
         Field(
-            description=("Specific ENA library strategies (e.g., ['RNA-Seq']). Overrides technology preset."),
+            description="Advanced: Specific sequencing strategies to filter by (e.g., ['RNA-Seq']). Overrides the technology preset. Call list_library_types() first to see all available options",
             examples=[["RNA-Seq"], ["miRNA-Seq", "ncRNA-Seq"]],
         ),
     ] = None,
     library_sources: Annotated[
         list[LibrarySource] | None,
         Field(
-            description=("Specific ENA library sources (e.g., ['TRANSCRIPTOMIC']). Overrides technology preset."),
+            description="Advanced: Specific library source materials to filter by (e.g., ['TRANSCRIPTOMIC']). Overrides the technology preset. Call list_library_types() first to see all available options",
             examples=[["TRANSCRIPTOMIC"], ["TRANSCRIPTOMIC SINGLE CELL"]],
         ),
     ] = None,
     limit: Annotated[
         int,
         Field(
-            description="Max studies to return (default 20, 0 = entire result set up to service caps).",
+            description="How many studies to return. Use 20 for initial searches, increase if needed. Set to 0 to get all results (up to system limits)",
             ge=0,
+            examples=[20, 50, 0],
         ),
     ] = 20,
 ) -> dict:
-    """Search ENA for RNA sequencing studies with exact run/sample counts."""
+    """Search for RNA sequencing studies by disease, tissue, and organism.
+
+    **When to use this tool**: Primary search tool for finding RNA-seq datasets when you know
+    the disease/condition OR tissue/cell-type you're interested in. Use search_studies_by_keywords()
+    for broader searches by biological processes or methodology.
+
+    **Default behavior**: Searches across ALL organisms unless you specify one. This helps find
+    relevant datasets across multiple species (human, mouse, rat, etc.).
+
+    **Search tips**:
+    - Try different keyword variations if no results (e.g., "ALS" vs "amyotrophic lateral sclerosis")
+    - Try broader terms (e.g., "neurodegeneration" instead of specific disease)
+    - Search all organisms first (organism=None), then filter to specific species if needed
+    - Use tissue parameter to narrow results to specific anatomical sites
+
+    Returns
+    -------
+    dict
+        Search results containing:
+        - count: How many total studies match your search
+        - returned: How many studies are in this response
+        - studies: List of matching studies with titles, sample counts, and publication info
+        - query_used: The exact search query that was executed
+        - filters: What filters were applied to your search
+    """
     client = ENAClient()
 
-    organism = normalize_organism(organism)
+    organism = normalize_organism(organism) if organism else None
     strategy_enums = list(library_strategies) if library_strategies else None
     source_enums = list(library_sources) if library_sources else None
     library_strategy_values = [s.value for s in strategy_enums] if strategy_enums else None
@@ -135,7 +152,9 @@ async def search_rna_studies(
         library_sources=source_enums,
     )
 
-    query_parts = [f'tax_name("{organism}")', rna_filter]
+    query_parts = [rna_filter]
+    if organism:
+        query_parts.insert(0, f'tax_name("{organism}")')
 
     if disease:
         disease_clause = _build_keyword_clause(disease, ["disease", "study_title"])
@@ -335,30 +354,21 @@ async def search_rna_studies(
 async def list_library_types() -> dict:
     """List all available library strategies and sources for ENA searches.
 
-    **Use this tool to discover what library types are available for filtering.**
-
-    Returns all controlled vocabulary values for library_strategy and library_source
-    that can be used with search_rna_studies().
+    Usage Tips
+    ----------
+    Use to discover available library types for filtering in search_rna_studies(). Returns all
+    controlled vocabulary values for library_strategy and library_source. Call this before using
+    the advanced library_strategies or library_sources parameters in search_rna_studies().
 
     Returns
     -------
     dict
         Dictionary with keys:
-        - library_strategies: List of dicts with "value" and "name"
-        - library_sources: List of dicts with "value" and "name"
+        - library_strategies: List of all strategies with "value" and "name"
+        - library_sources: List of all sources with "value" and "name"
         - rna_strategies: Filtered list of RNA-related strategies only
         - summary: Counts of available options
-
-    Examples
-    --------
-    Get all available options:
-        list_library_types()
-        # Returns full list of ~50 strategies and 9 sources
-
-    Use returned values in search:
-        # 1. Call list_library_types() to see options
-        # 2. Pick strategies from the returned list
-        # 3. Use in search_rna_studies(library_strategies=["Ribo-Seq"], technology=None)
+        - usage_hint: How to use values in search_rna_studies()
     """
     # Get all strategies from enum
     strategies = [

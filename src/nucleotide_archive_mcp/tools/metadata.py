@@ -1,8 +1,9 @@
 """Tools for discovering available fields and metadata."""
 
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
+from pydantic import Field
 
 from nucleotide_archive_mcp.ena_client import ENAClient
 from nucleotide_archive_mcp.mcp import mcp
@@ -10,45 +11,38 @@ from nucleotide_archive_mcp.mcp import mcp
 
 @mcp.tool
 async def get_available_fields(
-    result_type: str = "read_study",
-    field_category: str = "all",
+    result_type: Annotated[
+        str,
+        Field(
+            description="Type of ENA data to query (read_study, study, sample, read_run, read_experiment, analysis)",
+            examples=["read_study", "sample", "read_run"],
+        ),
+    ] = "read_study",
+    field_category: Annotated[
+        str,
+        Field(
+            description="Which fields to return (all, search, return)",
+            examples=["all", "search", "return"],
+        ),
+    ] = "all",
 ) -> dict:
     """Get available search and return fields for an ENA result type.
 
-    This tool helps you discover what fields you can search on and what
-    metadata fields are available for a given data type in ENA.
-
-    Parameters
+    Usage Tips
     ----------
-    result_type : str, optional
-        Type of data to query. Common options:
-        - "read_study": RNA-seq studies (default, recommended)
-        - "study": All studies
-        - "sample": Sample records
-        - "read_run": Individual sequencing runs
-        - "read_experiment": Sequencing experiments
-        - "analysis": Analysis records
-    field_category : str, optional
-        Which fields to return:
-        - "all": Both search and return fields (default)
-        - "search": Only searchable fields
-        - "return": Only returnable fields
+    Use to discover what fields you can search on and what metadata fields are available
+    for a given data type in ENA. Helpful for building custom queries with build_custom_query().
 
     Returns
     -------
     dict
         Dictionary containing:
         - result_type: The queried result type
-        - search_fields: List of searchable fields (if requested)
-        - return_fields: List of returnable fields (if requested)
-
-    Examples
-    --------
-    Get all fields for RNA-seq studies:
-        result_type="read_study"
-
-    Get only searchable fields for samples:
-        result_type="sample", field_category="search"
+        - search_fields: List of searchable fields with id, description, type (if requested)
+        - search_fields_count: Number of search fields (if requested)
+        - return_fields: List of returnable fields with id, description, type (if requested)
+        - return_fields_count: Number of return fields (if requested)
+        - error: Error message if any
     """
     client = ENAClient()
 
@@ -96,20 +90,19 @@ async def get_available_fields(
 async def get_result_types() -> dict:
     """Get all available result types (data categories) in ENA.
 
-    This tool shows what types of data you can search for in the
-    European Nucleotide Archive.
+    Usage Tips
+    ----------
+    Use to discover what types of data you can search for in the European Nucleotide Archive.
+    Most users will use read_study or study for RNA-seq searches.
 
     Returns
     -------
     dict
         Dictionary containing:
         - count: Number of available result types
-        - result_types: List of result types with descriptions
-
-    Examples
-    --------
-    Discover what data types are available:
-        (no parameters needed)
+        - result_types: List of result types with id, description, primaryAccessionType, recordCount, lastUpdated
+        - recommended_for_rna_studies: Recommended types for RNA studies
+        - error: Error message if any
     """
     client = ENAClient()
 
@@ -145,47 +138,43 @@ async def get_result_types() -> dict:
 
 @mcp.tool
 async def build_custom_query(
-    field_conditions: list[dict[str, str]],
-    operator: str = "AND",
+    field_conditions: Annotated[
+        list[dict[str, str]],
+        Field(
+            description='List of conditions, each with "field", "operator" (=, >=, <=, !=, contains), and "value"',
+            examples=[
+                [
+                    {"field": "tax_id", "operator": "=", "value": "9606"},
+                    {"field": "library_strategy", "operator": "=", "value": "RNA-Seq"},
+                ]
+            ],
+        ),
+    ],
+    operator: Annotated[
+        str,
+        Field(
+            description="Logical operator to combine conditions (AND or OR)",
+            examples=["AND", "OR"],
+        ),
+    ] = "AND",
 ) -> dict:
     """Build a custom ENA query from field conditions.
 
-    This advanced tool helps construct complex queries by combining multiple
-    field conditions with logical operators. Useful for precise filtering.
-
-    Parameters
+    Usage Tips
     ----------
-    field_conditions : list[dict]
-        List of conditions, each with keys:
-        - "field": Field name (e.g., "tax_id", "library_strategy")
-        - "operator": Comparison operator ("=", ">=", "<=", "!=", or "contains")
-        - "value": Value to compare
-    operator : str, optional
-        Logical operator to combine conditions: "AND" or "OR" (default: "AND")
+    Advanced tool for constructing complex queries by combining multiple field conditions with
+    logical operators. Use for precise filtering beyond what search_rna_studies() offers.
+    Call get_available_fields() first to discover searchable field names.
 
     Returns
     -------
     dict
         Dictionary containing:
         - query: The constructed ENA query string
-        - field_count: Number of conditions
-        - example_usage: How to use this query
-
-    Examples
-    --------
-    Build a query for human RNA-seq studies after 2020:
-        field_conditions=[
-            {"field": "tax_id", "operator": "=", "value": "9606"},
-            {"field": "library_strategy", "operator": "=", "value": "RNA-Seq"},
-            {"field": "first_public", "operator": ">=", "value": "2020-01-01"}
-        ]
-
-    Find studies with specific keywords:
-        field_conditions=[
-            {"field": "study_title", "operator": "contains", "value": "cancer"},
-            {"field": "study_description", "operator": "contains", "value": "treatment"}
-        ],
-        operator="OR"
+        - field_count: Number of conditions used
+        - operator: Logical operator used
+        - example_usage: How to use this query with other tools
+        - error: Error message if any
     """
     if not field_conditions:
         return {

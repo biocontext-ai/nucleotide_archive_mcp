@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Annotated
 
 import httpx
+from pydantic import Field
 
 from nucleotide_archive_mcp.ena_client import ENAClient
 from nucleotide_archive_mcp.mcp import mcp
@@ -107,100 +108,103 @@ async def _fetch_download_urls(
 
 @mcp.tool
 async def get_download_urls(
-    study_accession: Annotated[str, "Study accession from search_rna_studies (e.g., 'PRJDB2345')"],
-    file_format: Annotated[str, "File format: 'fastq', 'submitted', or 'sra'"] = "fastq",
-    include_md5: Annotated[bool, "Include MD5 checksums for file verification"] = True,
+    study_accession: Annotated[
+        str,
+        Field(
+            description="Study accession from search results. Accepts SRP/ERP/DRP or PRJNA/PRJEB/PRJDB formats",
+            examples=["PRJDB2345", "PRJNA123456", "SRP417965"],
+        ),
+    ],
+    file_format: Annotated[
+        str,
+        Field(
+            description="File format to download (fastq, submitted, or sra). FASTQ is most common",
+            examples=["fastq", "submitted", "sra"],
+        ),
+    ] = "fastq",
+    include_md5: Annotated[
+        bool,
+        Field(
+            description="Include MD5 checksums for file integrity verification",
+        ),
+    ] = True,
 ) -> dict:
     """Get FTP download URLs for all sequencing data files in a study.
 
-    **LLM Usage**: Call after search_rna_studies() to get download URLs for selected studies.
-    Returns FTP URLs that can be used with wget/curl or passed to generate_download_script().
-
-    Parameters
+    Usage Tips
     ----------
-    study_accession : str
-        Study accession from search results (e.g., "PRJDB2345", "PRJNA123456", "SRP417965")
-    file_format : str, optional
-        File format: "fastq" (processed FASTQ files, most common), "submitted" (original
-        submitted files), "sra" (SRA format). Default: "fastq"
-    include_md5 : bool, optional
-        Include MD5 checksums for file integrity verification. Default: True
+    Call after search_rna_studies() to get download URLs for selected studies. Returns FTP URLs
+    that can be used with wget/curl or passed to generate_download_script().
 
     Returns
     -------
     dict
-        - study_accession (str): Queried study
-        - file_count (int): Total number of files
-        - total_size_gb (float): Total download size in GB
-        - runs (list[dict]): Per-run file info, each containing:
+        Dictionary containing:
+        - study_accession: Queried study
+        - file_count: Total number of files
+        - total_size_gb: Total download size in GB
+        - runs: List of per-run file info, each with:
             - run_accession: Run identifier
             - file_count: Files in this run (2 for paired-end)
             - size_gb: Run size in GB
             - urls: List of FTP URLs (ftp://...)
             - md5_checksums: List of MD5 hashes (if include_md5=True)
-
-    Examples
-    --------
-    Get FASTQ URLs after finding studies:
-        study_accession="PRJDB2345"
-
-    Check file sizes before downloading:
-        study_accession="SRP417965", file_format="fastq"
+        - message: Info message if no files found
+        - error: Error message if any
     """
     return await _fetch_download_urls(study_accession, file_format, include_md5)
 
 
 @mcp.tool
 async def generate_download_script(
-    study_accession: Annotated[str, "Study accession from search_rna_studies"],
-    output_path: Annotated[str | None, "Save path for script (e.g., './download.sh'). None=return only"] = None,
-    script_type: Annotated[str, "Download tool: 'wget' or 'curl'"] = "wget",
-    file_format: Annotated[str, "File format: 'fastq', 'submitted', or 'sra'"] = "fastq",
+    study_accession: Annotated[
+        str,
+        Field(
+            description="Study accession from search results. Accepts SRP/ERP/DRP or PRJNA/PRJEB/PRJDB formats",
+            examples=["PRJDB2345", "SRP417965", "PRJNA123456"],
+        ),
+    ],
+    output_path: Annotated[
+        str | None,
+        Field(
+            description="File path to save script (e.g., './download.sh'). If None, returns script content without saving. Script will be made executable (chmod 755)",
+            examples=["./download.sh", "./download_study.sh", None],
+        ),
+    ] = None,
+    script_type: Annotated[
+        str,
+        Field(
+            description="Download tool to use (wget or curl). wget is recommended for resumable downloads with -nc flag",
+            examples=["wget", "curl"],
+        ),
+    ] = "wget",
+    file_format: Annotated[
+        str,
+        Field(
+            description="File format to download (fastq, submitted, or sra). FASTQ is most common",
+            examples=["fastq", "submitted", "sra"],
+        ),
+    ] = "fastq",
 ) -> dict:
     """Generate executable bash script to download all study data files.
 
-    **LLM Usage**: After identifying interesting studies, generate a download script for the
-    user to execute. Returns script content and optionally saves to file. Script includes
-    MD5 verification commands.
-
-    **Typical workflow**:
-    1. search_rna_studies() → find studies
-    2. get_study_details() → verify it's the right study
-    3. generate_download_script() → create download script
-    4. User executes the script to download data
-
-    Parameters
+    Usage Tips
     ----------
-    study_accession : str
-        Study accession (e.g., "PRJDB2345", "SRP417965")
-    output_path : str, optional
-        File path to save script (e.g., "./download_study.sh"). If None, returns
-        script content without saving. Script will be made executable (chmod 755).
-    script_type : str, optional
-        Download tool: "wget" (recommended, resumable with -nc) or "curl" (resumable with -C -)
-    file_format : str, optional
-        File format: "fastq" (most common), "submitted", "sra"
+    After identifying interesting studies, generate a download script for the user to execute.
+    Returns script content and optionally saves to file. Script includes MD5 verification commands.
+    Typical workflow: search_rna_studies() → get_study_details() → generate_download_script().
 
     Returns
     -------
     dict
-        - study_accession (str): Queried study
-        - script_content (str): Complete bash script (can be directly executed)
-        - file_count (int): Number of files script will download
-        - total_size_gb (float): Total download size
-        - script_path (str): Save location (if output_path provided)
-        - message (str): Success/error message
-
-    Examples
-    --------
-    Generate and return wget script:
-        study_accession="PRJDB2345"
-
-    Save wget script to file (recommended):
-        study_accession="SRP417965", output_path="./download_srp417965.sh"
-
-    Generate curl-based script:
-        study_accession="PRJDB2345", script_type="curl"
+        Dictionary containing:
+        - study_accession: Queried study
+        - script_content: Complete bash script ready to execute
+        - file_count: Number of files the script will download
+        - total_size_gb: Total download size in GB
+        - script_path: Save location (if output_path provided)
+        - message: Success message (if saved to file)
+        - error: Error message if any
     """
     # First get the download URLs
     url_data = await _fetch_download_urls(

@@ -2,41 +2,38 @@
 
 from typing import Annotated
 
+from pydantic import Field
+
 from nucleotide_archive_mcp.ena_client import ENAClient
 from nucleotide_archive_mcp.mcp import mcp
 
 
 @mcp.tool
 async def find_studies_by_publication(
-    pubmed_id: Annotated[str, "PubMed ID (e.g., '36913357'). API limitation: returns error."],
+    pubmed_id: Annotated[
+        str,
+        Field(
+            description="PubMed ID to search for. Note: This tool has known API limitations and will return an error with alternative instructions",
+            examples=["36913357", "33247152"],
+        ),
+    ],
 ) -> dict:
-    """Find ENA studies by PubMed ID (CURRENTLY LIMITED - see alternative below).
+    """Find ENA studies by PubMed ID (API limitation - returns error with workaround).
 
-    **API LIMITATION**: ENA Portal API doesn't expose pubmed_id as searchable field.
-    This tool returns an error. Instead:
-
-    **Recommended Alternative Workflow**:
-    1. Use search_studies_by_keywords() with terms from the publication
-    2. Call get_study_details() on results to check publications[] array
-    3. Match publications[].pubmed_id to find the right study
-
-    **Why this exists**: Documented limitation for LLM awareness. Use get_study_details()
-    to retrieve PubMed IDs from studies, not to search by them.
-
-    Parameters
+    Usage Tips
     ----------
-    pubmed_id : str
-        PubMed ID (e.g., "36913357"). Tool will return error about limitation.
+    ENA Portal API doesn't expose pubmed_id as a searchable field. This tool documents the
+    limitation for LLM awareness. Instead: use search_studies_by_keywords() with publication
+    terms, then call get_study_details() to check the publications array for matching PubMed IDs.
 
     Returns
     -------
     dict
-        Error dict with alternative instructions
-
-    Examples
-    --------
-    Will return API limitation error:
-        pubmed_id="33247152"
+        Dictionary containing:
+        - error: API limitation message with recommended workflow
+        - pubmed_id: Provided PubMed ID
+        - count: Always 0
+        - studies: Always empty list
     """
     # Note: pubmed_id field is not available in ENA Portal API
     return {
@@ -54,55 +51,71 @@ async def find_studies_by_publication(
 
 @mcp.tool
 async def search_studies_by_keywords(
-    keywords: Annotated[str, "Keywords to search (e.g., 'immune response', 'breast cancer')"],
-    include_title: Annotated[bool, "Search in study titles"] = True,
-    include_description: Annotated[bool, "Search in descriptions (may match samples too)"] = True,
-    organism: Annotated[str | None, "Filter by organism (e.g., 'Homo sapiens')"] = None,
-    limit: Annotated[int, "Max results (default: 20)"] = 20,
+    keywords: Annotated[
+        str,
+        Field(
+            description="Keywords to search for in study titles and descriptions (e.g., 'immune response', 'transcription factor'). Multi-word phrases are automatically split into individual words that must all match",
+            examples=["immune response", "breast cancer", "RNA binding protein", "transcriptome", "cell cycle"],
+        ),
+    ],
+    include_title: Annotated[
+        bool,
+        Field(
+            description="Whether to search in study titles (recommended: keep True)",
+        ),
+    ] = True,
+    include_description: Annotated[
+        bool,
+        Field(
+            description="Whether to search in study descriptions. This searches sample-level descriptions and may broaden results",
+        ),
+    ] = True,
+    organism: Annotated[
+        str | None,
+        Field(
+            description="Optionally filter by organism. Use common name like 'human' or scientific name like 'Homo sapiens'. Leave as None to search across all organisms",
+            examples=["Homo sapiens", "Mus musculus", "human", "mouse", None],
+        ),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(
+            description="How many studies to return. Start with 20, increase if needed",
+            ge=1,
+            examples=[20, 50, 100],
+        ),
+    ] = 20,
 ) -> dict:
-    """Flexible keyword search across study titles and descriptions.
+    """Search for studies using flexible keyword matching across titles and descriptions.
 
-    **LLM Usage**: Use when search_rna_studies() is too specific (disease-only). Good for:
-    - Broad exploratory searches
-    - Finding studies by biological process/pathway terms
-    - Searching when you know methodology but not disease
+    **When to use this tool**: Use this for broad exploratory searches when search_rna_studies()
+    is too restrictive. Good for:
+    - Searching by biological processes, pathways, or molecular mechanisms
+    - Finding studies about specific genes, proteins, or complexes
+    - Searching by methodology when you don't know the specific disease
+    - General exploratory searches across many study types
 
-    **Note**:
-    - Searches title (study-level) and description (sample-level) fields, so may
-      return studies where only one sample matches keywords.
-    - Multi-word keywords are automatically split and searched individually
-      (e.g., "breast cancer" → searches for "breast" AND "cancer").
+    **Important notes**:
+    - Searches both study-level titles AND sample-level descriptions
+    - Multi-word keywords are split: "breast cancer" searches for "breast" AND "cancer"
+    - May return studies where only one sample mentions your keywords
+    - Results can be broader than search_rna_studies() disease/tissue filters
 
-    Parameters
-    ----------
-    keywords : str
-        Keywords to find (e.g., "immune response", "breast cancer", "RNA binding protein").
-        Wildcards (*) automatically added.
-    include_title : bool, optional
-        Search study_title field (study-level). Default: True.
-    include_description : bool, optional
-        Search description field (sample-level). May broaden results. Default: True.
-    organism : str, optional
-        Filter by NCBI scientific name (e.g., "Homo sapiens"). None=all organisms.
-    limit : int, optional
-        Max results (default: 20).
+    **Search tips**:
+    - Try keyword variations and abbreviations if no results (e.g., "immune response" vs "immunity")
+    - Try broader or narrower terms (e.g., "transcription" vs "transcription factor binding")
+    - Consider searching multiple organisms if limited results in one species
+    - Use organism filter to narrow down results to specific species
 
     Returns
     -------
     dict
-        - count (int): Total matching studies
-        - returned (int): Studies in this response
-        - keywords_used (str): Keywords searched
-        - organism_filter (str|None): Organism filter applied
-        - studies (list[dict]): Matching studies
-
-    Examples
-    --------
-    Find human immune response studies:
-        keywords="immune response", organism="Homo sapiens"
-
-    Broad search across all organisms:
-        keywords="transcriptome", limit=50
+        Search results containing:
+        - count: How many total studies match
+        - returned: How many studies in this response
+        - keywords_used: What keywords were searched
+        - organism_filter: What organism filter was applied (if any)
+        - studies: List of matching studies with accession, title, organism, and other metadata
     """
     client = ENAClient()
 

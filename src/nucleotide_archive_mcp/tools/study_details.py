@@ -3,6 +3,7 @@
 from typing import Annotated, Any
 
 import httpx
+from pydantic import Field
 
 from nucleotide_archive_mcp.config import DEFAULT_TIMEOUT, ENA_BROWSER_API_BASE
 from nucleotide_archive_mcp.mcp import mcp
@@ -12,54 +13,38 @@ EUROPEPMC_API_BASE = "https://www.ebi.ac.uk/europepmc/webservices/rest"
 
 @mcp.tool
 async def get_study_details(
-    study_accession: Annotated[str, "Study accession from search results (e.g., 'SRP417965', 'PRJNA123456')"],
+    study_accession: Annotated[
+        str,
+        Field(
+            description="Study accession from search results. Accepts SRP/ERP/DRP or PRJNA/PRJEB/PRJDB formats",
+            examples=["SRP417965", "PRJNA123456", "PRJEB12345"],
+        ),
+    ],
 ) -> dict:
     """Get comprehensive metadata for a specific ENA study including publications.
 
-    **LLM Usage**: Call this AFTER search_rna_studies() to get full study metadata including
-    descriptions and PubMed IDs. This uses the ENA Browser API which provides richer metadata
-    than search results.
-
-    **Typical workflow**:
-    1. search_rna_studies() → get list of studies
-    2. get_study_details() → get full metadata for interesting studies (THIS TOOL)
-    3. Extract publications[].pubmed_id if you need to reference papers
-    4. get_download_urls() or generate_download_script() → get data files
-
-    **Key feature**: Returns `publications` array with PubMed IDs, unlike search results.
-
-    Parameters
+    Usage Tips
     ----------
-    study_accession : str
-        Study accession from search_rna_studies results. Accepts multiple formats:
-        - SRP/ERP/DRP: Sequence Read Archive format (e.g., "SRP417965")
-        - PRJNA/PRJEB/PRJDB: BioProject format (e.g., "PRJNA123456")
+    Call after search_rna_studies() to verify a study matches your research needs before downloading.
+    Returns detailed study description, publication links, and institutional metadata. Use this to
+    check publications array for PubMed IDs.
 
     Returns
     -------
     dict
-        - accession (str): Study accession
-        - title (str): Brief study title
-        - description (str): Detailed study description (full abstract/methods)
-        - publications (list[dict]): Associated publications, each with:
-            - pubmed_id (str): PubMed ID for the paper
-            - source (str): "PubMed"
-        - center_name (str): Submitting institution
-        - alias (str): Submitter's study name (often GSE accession for GEO)
-        - data_type (str): Usually "STUDY"
-        - status (str): "public" or "private"
-        - first_public (str): Date made public (YYYY-MM-DD)
-        - last_updated (str): Last modification date (YYYY-MM-DD)
-        - file_report_links (list[dict]): Direct API links for file reports
-        - error (str|None): Error message if study not found
-
-    Examples
-    --------
-    Get full metadata after search:
-        study_accession="SRP417965"
-
-    Check if study has publications:
-        study_accession="PRJDB2345"
+        Dictionary containing:
+        - accession: Study accession
+        - title: Brief study title
+        - description: Detailed study description (full abstract/methods)
+        - publications: List of publications with pubmed_id and source
+        - center_name: Submitting institution
+        - alias: Submitter's study name (often GSE accession for GEO)
+        - data_type: Usually "STUDY"
+        - status: "public" or "private"
+        - first_public: Date made public (YYYY-MM-DD)
+        - last_updated: Last modification date (YYYY-MM-DD)
+        - file_report_links: Direct API links for file reports
+        - error: Error message if study not found or if request fails
     """
     try:
         # Use ENA Browser API for rich metadata including publications
@@ -128,59 +113,49 @@ async def get_study_details(
 
 @mcp.tool
 async def get_study_publications(
-    study_accession: Annotated[str, "Study accession (e.g., 'SRP417965', 'PRJNA802133')"],
+    study_accession: Annotated[
+        str,
+        Field(
+            description="Study accession from search results. Accepts SRP/ERP/DRP or PRJNA/PRJEB/PRJDB formats",
+            examples=["SRP417965", "PRJNA802133", "PRJEB12345"],
+        ),
+    ],
 ) -> dict:
     """Get detailed publication information for a study from ENA and Europe PMC.
 
-    **LLM Usage**: Use this to get comprehensive publication details including:
-    - Full title, authors, and abstract
-    - Journal information and DOI
-    - Publication date and citation count
-    - Full text links (if available)
-    - Author affiliations and ORCID IDs
-
-    **Workflow**:
-    1. First calls ENA Browser API to get PubMed IDs for the study
-    2. Then queries Europe PMC for detailed publication metadata
-    3. Returns enriched publication information
-
-    Parameters
+    Usage Tips
     ----------
-    study_accession : str
-        Study accession from search_rna_studies results. Accepts:
-        - SRP/ERP/DRP format (e.g., "SRP417965")
-        - PRJNA/PRJEB/PRJDB format (e.g., "PRJNA802133")
+    Call after search_rna_studies() to get full publication metadata including author ORCID IDs,
+    affiliations, citation counts, and full-text links. Enriches basic publication info from
+    get_study_details() with complete bibliographic data from Europe PMC.
 
     Returns
     -------
     dict
-        - accession (str): Study accession
-        - publication_count (int): Number of publications found
-        - publications (list[dict]): Detailed publication data, each with:
-            - pubmed_id (str): PubMed ID
-            - pmcid (str|None): PubMed Central ID
-            - doi (str|None): Digital Object Identifier
-            - title (str): Publication title
-            - authors (list[str]): Author names
-            - first_author (str|None): First author name
-            - last_author (str|None): Last author name
-            - journal (str|None): Journal name
-            - publication_year (int|None): Year published
-            - publication_date (str|None): Full publication date
-            - abstract (str|None): Publication abstract
-            - citation_count (int|None): Times cited
-            - is_open_access (bool): Whether open access
-            - full_text_urls (list[dict]|None): Available full text links
-            - author_affiliations (list[dict]|None): Detailed author info with ORCID
-        - error (str|None): Error message if any
-
-    Examples
-    --------
-    Get publication details for a study:
-        study_accession="PRJNA802133"
-
-    Find papers associated with dataset:
-        study_accession="SRP417965"
+        Dictionary containing:
+        - accession: Study accession
+        - publication_count: Number of publications found
+        - publications: List of detailed publication objects, each with:
+            - pubmed_id: PubMed ID
+            - pmcid: PubMed Central ID (if available)
+            - doi: Digital Object Identifier (if available)
+            - title: Publication title
+            - authors: List of author names
+            - first_author: First author name
+            - last_author: Last author name
+            - author_details: Detailed author info with ORCID and affiliations
+            - journal: Journal name
+            - journal_issn: Journal ISSN
+            - publication_year: Year published
+            - publication_date: Full publication date
+            - abstract: Publication abstract
+            - citation_count: Times cited
+            - is_open_access: Whether open access
+            - in_epmc: Whether in Europe PMC
+            - in_pmc: Whether in PubMed Central
+            - has_pdf: Whether PDF available
+            - full_text_urls: Available full text links
+        - error: Error message if any
     """
     try:
         # Step 1: Get PubMed IDs from ENA Browser API
