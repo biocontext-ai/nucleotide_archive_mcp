@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -1339,7 +1339,7 @@ wheels = [
 
 [[package]]
 name = "nucleotide-archive-mcp"
-version = "0.0.3"
+version = "0.0.6"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -1383,7 +1383,7 @@ requires-dist = [
     { name = "click" },
     { name = "coverage", marker = "extra == 'test'" },
     { name = "docutils", marker = "extra == 'doc'", specifier = ">=0.8,!=0.18.*,!=0.19.*" },
-    { name = "fastmcp" },
+    { name = "fastmcp", specifier = "<3" },
     { name = "httpx", specifier = "==0.28.*" },
     { name = "ipykernel", marker = "extra == 'doc'" },
     { name = "ipython", marker = "extra == 'doc'" },
